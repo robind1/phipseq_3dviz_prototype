@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PhIP-seq Analysis - 6xr8</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .epitope { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>PhIP-seq Analysis - 6xr8</h1>
+    <p><strong>Epitopes found:</strong> 25</p>
+    <p><strong>Note:</strong> For interactive 3D visualization, use the Streamlit app.</p>
+    <div id="epitopes">
+        <div class="epitope">Residues 541-579 (Z-score: 3.72)</div><div class="epitope">Residues 561-599 (Z-score: 3.92)</div><div class="epitope">Residues 641-679 (Z-score: 8.04)</div><div class="epitope">Residues 801-839 (Z-score: 5.92)</div><div class="epitope">Residues 881-919 (Z-score: 3.81)</div><div class="epitope">Residues 1081-1119 (Z-score: 3.81)</div><div class="epitope">Residues 1141-1179 (Z-score: 10.15)</div><div class="epitope">Residues 81-119 (Z-score: 4.33)</div><div class="epitope">Residues 121-159 (Z-score: 6.67)</div><div class="epitope">Residues 181-219 (Z-score: 6.67)</div><div class="epitope">Residues 461-499 (Z-score: 6.67)</div><div class="epitope">Residues 641-679 (Z-score: 9.0)</div><div class="epitope">Residues 681-719 (Z-score: 5.27)</div><div class="epitope">Residues 701-739 (Z-score: 11.34)</div><div class="epitope">Residues 801-839 (Z-score: 16.02)</div><div class="epitope">Residues 881-919 (Z-score: 4.33)</div><div class="epitope">Residues 1061-1099 (Z-score: 6.67)</div><div class="epitope">Residues 1121-1159 (Z-score: 5.18)</div><div class="epitope">Residues 1221-1259 (Z-score: 4.33)</div><div class="epitope">Residues 21-59 (Z-score: 4.19)</div><div class="epitope">Residues 221-259 (Z-score: 4.41)</div><div class="epitope">Residues 1141-1179 (Z-score: 5.42)</div><div class="epitope">Residues 81-119 (Z-score: 5.35)</div><div class="epitope">Residues 301-339 (Z-score: 5.44)</div><div class="epitope">Residues 381-419 (Z-score: 5.35)</div>
+    </div>
+    <script>
+        var epitopes = [
+  {
+    "start": 541,
+    "end": 579,
+    "zscore": 3.72
+  },
+  {
+    "start": 561,
+    "end": 599,
+    "zscore": 3.92
+  },
+  {
+    "start": 641,
+    "end": 679,
+    "zscore": 8.04
+  },
+  {
+    "start": 801,
+    "end": 839,
+    "zscore": 5.92
+  },
+  {
+    "start": 881,
+    "end": 919,
+    "zscore": 3.81
+  },
+  {
+    "start": 1081,
+    "end": 1119,
+    "zscore": 3.81
+  },
+  {
+    "start": 1141,
+    "end": 1179,
+    "zscore": 10.15
+  },
+  {
+    "start": 81,
+    "end": 119,
+    "zscore": 4.33
+  },
+  {
+    "start": 121,
+    "end": 159,
+    "zscore": 6.67
+  },
+  {
+    "start": 181,
+    "end": 219,
+    "zscore": 6.67
+  },
+  {
+    "start": 461,
+    "end": 499,
+    "zscore": 6.67
+  },
+  {
+    "start": 641,
+    "end": 679,
+    "zscore": 9.0
+  },
+  {
+    "start": 681,
+    "end": 719,
+    "zscore": 5.27
+  },
+  {
+    "start": 701,
+    "end": 739,
+    "zscore": 11.34
+  },
+  {
+    "start": 801,
+    "end": 839,
+    "zscore": 16.02
+  },
+  {
+    "start": 881,
+    "end": 919,
+    "zscore": 4.33
+  },
+  {
+    "start": 1061,
+    "end": 1099,
+    "zscore": 6.67
+  },
+  {
+    "start": 1121,
+    "end": 1159,
+    "zscore": 5.18
+  },
+  {
+    "start": 1221,
+    "end": 1259,
+    "zscore": 4.33
+  },
+  {
+    "start": 21,
+    "end": 59,
+    "zscore": 4.19
+  },
+  {
+    "start": 221,
+    "end": 259,
+    "zscore": 4.41
+  },
+  {
+    "start": 1141,
+    "end": 1179,
+    "zscore": 5.42
+  },
+  {
+    "start": 81,
+    "end": 119,
+    "zscore": 5.35
+  },
+  {
+    "start": 301,
+    "end": 339,
+    "zscore": 5.44
+  },
+  {
+    "start": 381,
+    "end": 419,
+    "zscore": 5.35
+  }
+];
+        console.log('Epitopes data:', epitopes);
+    </script>
+</body>
+</html>
