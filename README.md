@@ -1,6 +1,7 @@
-# PhIP-seq 3D Visualization Dashboard
+# PhIP-seq 3D Visualization Dashboard (Development Phase)
 
 This platform provides an interactive 3D visualization of PhIP-Seq enriched epitopes mapped onto protein structures (PDB/CIF format), results from the PhIP-Seq pipeline.
+Access link: https://phipseq3dvizprototype-test.streamlit.app/
 
 ## Features
 
