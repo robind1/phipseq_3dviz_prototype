@@ -1,11 +1,10 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import os
-from pathlib import Path
+import base64
+import json
 import requests
-import stmol
-from stmol import showmol
-import py3Dmol;
 
 st.set_page_config(
     page_title="PhIP-seq 3D Visualization",
@@ -21,7 +20,6 @@ AA_MAP = {
 
 def get_pdb_residue_mapping(pdb_content, fmt='pdb'):
     chains = {}
-    
     lines = pdb_content.splitlines()
     
     if fmt == 'pdb':
@@ -41,7 +39,7 @@ def get_pdb_residue_mapping(pdb_content, fmt='pdb'):
                     chains[chain_id]['seq'] += AA_MAP[res_name]
                     chains[chain_id]['ids'].append(res_seq)
 
-    elif fmt == 'cif':
+    elif fmt == 'cif' or fmt == 'mmcif':
         loop_indices = {}
         in_loop = False
         
@@ -77,9 +75,7 @@ def get_pdb_residue_mapping(pdb_content, fmt='pdb'):
                                 chains[chain_id]['ids'].append(res_seq)
                     except (ValueError, IndexError):
                         continue
-    
     return chains
-
 
 def find_sequence_locations(peptide_seq, pdb_mapping, first_match_only=False):
     matches = []
@@ -109,7 +105,6 @@ def find_sequence_locations(peptide_seq, pdb_mapping, first_match_only=False):
     if found_exact:
         return matches
 
-
     WINDOW_SIZE = 7
     if len(peptide_seq) < WINDOW_SIZE:
         WINDOW_SIZE = len(peptide_seq)
@@ -125,7 +120,6 @@ def find_sequence_locations(peptide_seq, pdb_mapping, first_match_only=False):
             if idx != -1:
                 if chain_id not in fragment_matches:
                     fragment_matches[chain_id] = set()
-                
                 res_ids = data['ids'][idx : idx + WINDOW_SIZE]
                 fragment_matches[chain_id].update(res_ids)
 
@@ -140,6 +134,7 @@ def find_sequence_locations(peptide_seq, pdb_mapping, first_match_only=False):
                 break
                 
     return matches
+
 
 st.title("PhIP-seq 3D Visualization")
 st.markdown("Interactive 3D PhIP-Seq enriched epitope visualization")
@@ -164,7 +159,7 @@ def fetch_pdb_content(pdb_id):
     local_path_cif = f'data/pdb_files/{pdb_id}.cif'
     if os.path.exists(local_path_cif):
         with open(local_path_cif, 'r') as f:
-            return f.read(), 'cif'
+            return f.read(), 'cif' 
     
     try:
         url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
@@ -195,13 +190,17 @@ if not epitope_df.empty:
         st.sidebar.warning("No sample information found in data.")
     
     bg_color = st.sidebar.selectbox("Background:", ["white", "black"])
+    bg_color_hex = "#ffffff" if bg_color == "white" else "#000000"
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Visualization Options**")
+    
+    spin_on_load = st.sidebar.checkbox("Auto-Spin", value=False)
+    
     highlight_all_chains = st.sidebar.checkbox(
         "Highlight all chains (Multimer)", 
         value=True,
-        help="Highlights the sequence in all protein chains. Uncheck to see only in one chain."
+        help="Highlights the sequence in all protein chains."
     )
     
     if selected_sample and selected_sample != "View Structure Only":
@@ -231,7 +230,6 @@ if not epitope_df.empty:
         
         with details_col:
             st.markdown("### Epitope Selection")
-            st.markdown("Select an epitope below to isolate it in the viewer.")
             
             if not filtered_df.empty:
                 epitope_options = []
@@ -248,88 +246,150 @@ if not epitope_df.empty:
                 
                 epitope_options.insert(0, "View All Enriched")
                 
-                selected_option = st.selectbox(
-                    "Select Epitope:",
-                    epitope_options,
-                    index=0
-                )
+                selected_option = st.selectbox("Select Epitope:", epitope_options, index=0)
                 
                 if selected_option != "View All Enriched":
                     selected_row = epitope_map[selected_option]
                     selected_epitope_id = selected_row['peptide_id']
-                    
                     st.markdown("---")
                     st.markdown(f"**Peptide ID:** {selected_epitope_id}")
                     st.markdown(f"**Z-score:** {selected_row['zscore']:.2f}")
-                    st.markdown(f"**Sequence:**")
                     st.code(selected_row.get('sequence', 'N/A'))
-
                 else:
                     st.markdown("---")
                     st.info(f"Showing all {len(filtered_df)} enriched epitopes.")
-
             else:
                 st.markdown("*No epitopes available.*")
             
             st.markdown("---")
-            with st.expander("PDB/CIF Structure Info", expanded=False):
+            with st.expander("Structure Info", expanded=False):
                 for chain, data in pdb_mapping.items():
                     if data['ids']:
-                        st.text(f"Chain {chain}: Residues {min(data['ids'])} - {max(data['ids'])}")
-                    else:
-                        st.text(f"Chain {chain}: No residues found")
+                        st.text(f"Chain {chain}: {min(data['ids'])} - {max(data['ids'])}")
 
         with view_col:
-            xyzview = py3Dmol.view(width=800, height=600)
-            xyzview.addModel(pdb_content, pdb_format)
-            xyzview.setStyle({'cartoon': {'color': 'lightgray'}})
+            molstar_selections = []
+            
+
+            for chain_id in pdb_mapping.keys():
+                molstar_selections.append({
+                    'struct_asym_id': chain_id,
+                    'color': {'r': 220, 'g': 220, 'b': 220}, 
+                    'focus': False
+                })
             
             if not filtered_df.empty:
-                
                 if selected_epitope_id is not None:
                     rows_to_highlight = filtered_df[filtered_df['peptide_id'] == selected_epitope_id]
-                    highlight_color = 'green'
+                    color_rgb = {'r': 0, 'g': 255, 'b': 0} 
                 else:
                     rows_to_highlight = filtered_df
-                    highlight_color = 'red'
+                    color_rgb = {'r': 255, 'g': 0, 'b': 0}
                 
-                found_any = False
                 for _, row in rows_to_highlight.iterrows():
                     peptide_seq = row.get('sequence', '')
-                    
                     matches = find_sequence_locations(
                         peptide_seq, 
                         pdb_mapping, 
                         first_match_only=(not highlight_all_chains)
                     )
                     
-                    if matches:
-                        found_any = True
-                        for match in matches:
-                            xyzview.addStyle(
-                                {'chain': match['chain'], 'resi': match['resi']},
-                                {'cartoon': {'color': highlight_color}}
-                            )
+                    for match in matches:
+                        residues = sorted(match['resi'])
+                        if not residues: continue
+                        
+                        ranges = []
+                        start = residues[0]
+                        prev = residues[0]
+                        
+                        for r in residues[1:]:
+                            if r != prev + 1:
+                                ranges.append((start, prev))
+                                start = r
+                            prev = r
+                        ranges.append((start, prev))
+                        
+                        for r_start, r_end in ranges:
+                            molstar_selections.append({
+                                'struct_asym_id': match['chain'],
+                                'start_residue_number': r_start,
+                                'end_residue_number': r_end,
+                                'color': color_rgb,
+                                'focus': False
+                            })
 
-                if selected_epitope_id is not None:
-                    if found_any:
-                        st.success(f"Highlighted peptide {selected_epitope_id}")
-                    else:
-                        st.warning(f"Peptide {selected_epitope_id} not found. Check 'PDB Structure Coverage Info' on the right to see valid residue ranges.")
-
-            elif selected_sample != "View Structure Only":
-                st.info(f"No epitopes found for {selected_sample}. Showing base structure.")
+            b64_pdb = base64.b64encode(pdb_content.encode()).decode()
             
-            xyzview.setBackgroundColor(bg_color)
-            xyzview.zoomTo()
-            showmol(xyzview, height=600, width=800)
+
+            html_code = (
+                f'<!DOCTYPE html>'
+                f'<html lang="en">'
+                f'<head>'
+                f'    <meta charset="utf-8" />'
+                f'    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">'
+                f'    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar.css">'
+                f'    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js"></script>'
+                f'    <style>'
+                f'        * {{ margin: 0; padding: 0; box-sizing: border-box; }}'
+                f'        .viewer-section {{ position: relative; width: 100%; height: 600px; }}'
+                f'        #myViewer {{ position: absolute; top: 0; left: 0; right: 0; bottom: 0; }}'
+                f'    </style>'
+                f'</head>'
+                f'<body>'
+                f'    <div class="viewer-section">'
+                f'        <div id="myViewer"></div>'
+                f'    </div>'
+                f'    <script>'
+                f'        var pdbBase64 = "{b64_pdb}";'
+                f'        var pdbFormat = "{pdb_format}";'
+                f'        var bgColorHex = "{bg_color_hex}";'
+                f'        function hexToRgb(hex) {{'
+                f'            var result = /^#?([a-f0-9]{{2}})([a-f0-9]{{2}})([a-f0-9]{{2}})$/i.exec(hex);'
+                f'            return result ? {{ r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }} : {{r: 255, g: 255, b: 255}};'
+                f'        }}'
+                f'        function b64toBlob(b64Data, contentType="", sliceSize=512) {{'
+                f'            var byteCharacters = atob(b64Data);'
+                f'            var byteArrays = [];'
+                f'            for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {{'
+                f'                var slice = byteCharacters.slice(offset, offset + sliceSize);'
+                f'                var byteNumbers = new Array(slice.length);'
+                f'                for (var i = 0; i < slice.length; i++) {{ byteNumbers[i] = slice.charCodeAt(i); }}'
+                f'                var byteArray = new Uint8Array(byteNumbers);'
+                f'                byteArrays.push(byteArray);'
+                f'            }}'
+                f'            return new Blob(byteArrays, {{type: contentType}});'
+                f'        }}'
+                f'        var blob = b64toBlob(pdbBase64, "text/plain");'
+                f'        var blobUrl = URL.createObjectURL(blob);'
+                f'        var viewerInstance = new PDBeMolstarPlugin();'
+                f'        var options = {{'
+                f'            customData: {{ url: blobUrl, format: pdbFormat, binary: false }},'
+                f'            bgColor: hexToRgb(bgColorHex),'
+                f'            hideControls: true,'
+                f'            hideCanvasControls: ["selection", "controlInfo"]'
+                f'        }};'
+                f'        var viewerContainer = document.getElementById("myViewer");'
+                f'        viewerInstance.render(viewerContainer, options);'
+                f'        viewerInstance.events.loadComplete.subscribe(() => {{'
+                f'            var selections = {json.dumps(molstar_selections)};'
+                f'            if(selections.length > 0) {{'
+                f'                try {{ viewerInstance.visual.select({{ data: selections }}); }} catch(err) {{ console.error("Selection error", err); }}'
+                f'            }}'
+                f'            var spin = {str(spin_on_load).lower()};'
+                f'            if(spin) {{ viewerInstance.visual.toggleSpin(true); }}'
+                f'        }});'
+                f'    </script>'
+                f'</body>'
+                f'</html>'
+            )
+            
+            components.html(html_code, height=600)
             
     else:
         st.error(f"Could not load structure for {selected_pdb}")
 
 else:
     st.warning("No epitope data found.")
-    st.info("Check the pipeline logs for more details.")
 
 st.markdown("---")
-st.markdown("**Generated by PhIP-Seq pipeline (SPHERES Lab Team) | Powered by Streamlit | Development Phase (Prototype)**")
+st.markdown("*Generated by PhIP-Seq pipeline (SPHERES Lab Team) | Powered by Streamlit & MolStar | Development Phase (Prototype)*")
